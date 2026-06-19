@@ -148,13 +148,65 @@ canvas {
 /* Make the hidden attribute win over flex/grid display rules. */
 [hidden] { display: none !important; }
 
-/* ---- Level select ------------------------------------------------------- */
-.menu {
+/* ---- Chapter / level select --------------------------------------------- */
+.menu { padding: 6px 0 4px; }
+#chapterScreen, #levelScreen {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  padding: 6px 0 4px;
+}
+
+.screen-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.screen-head .menu-title { margin: 0; }
+
+.chapters {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  width: min(560px, 92vw);
+}
+
+.chapter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  min-height: 104px;
+  text-align: left;
+  border-radius: 14px;
+  border: 1px solid #2f3a64;
+  background: linear-gradient(180deg, #1a2240, #141a30);
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.08s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.chapter:hover:not(.locked) { transform: translateY(-2px); }
+.chapter .cnum { font-size: 11px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; }
+.chapter .cname { font-size: 16px; font-weight: 700; }
+.chapter .cprog { margin-top: auto; font-size: 12px; color: var(--muted); }
+.chapter .bar { height: 5px; border-radius: 3px; background: #0d1428; overflow: hidden; }
+.chapter .bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.2s ease; }
+
+.chapter.open { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 8px 24px rgba(124,156,255,0.22); }
+.chapter.done { border-color: #2bd4a6; }
+.chapter.done .bar > i { background: #2bd4a6; }
+.chapter.done .cname { color: #5be3bf; }
+.chapter.locked { cursor: not-allowed; opacity: 0.45; }
+.chapter .lock { display: none; position: absolute; top: 12px; right: 14px; font-size: 12px; }
+.chapter.locked .lock { display: inline; }
+.chapter.sel { outline: 3px solid #ffffff; outline-offset: 2px; }
+
+.continue {
+  font-size: 14px;
+  padding: 8px 18px;
+  border-color: var(--accent);
+  background: #283464;
 }
 
 .menu-title {
@@ -297,4 +349,5 @@ canvas {
   h1 { font-size: 26px; }
   .grid { grid-template-columns: repeat(4, 1fr); gap: 10px; }
   .tile .nm { font-size: 9px; }
+  .chapters { grid-template-columns: repeat(2, 1fr); gap: 10px; }
 }

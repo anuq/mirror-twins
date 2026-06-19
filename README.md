@@ -14,8 +14,10 @@ desync them — and steer clear of the spikes.
 
 Just open `index.html` in a browser. That's it — works on desktop and mobile.
 
-Pick a level from the **level select** screen (clear a level to unlock the next;
-progress is saved on your device), then:
+There are **50 levels across 5 chapters** (First Steps → Reflections → Blocking
+Walls → Spikes → Mastery). Pick a chapter, then a level — clearing levels unlocks
+new chapters, a **Continue** button jumps to where you left off, and progress is
+saved on your device. Then:
 
 **Desktop**
 - **Arrow keys** — move every twin one step (each through its own mirror)
@@ -50,14 +52,16 @@ and spikes reset the level.
 | `index.html`  | page shell + canvas + UI                                       |
 | `style.css`   | dark neon theme, level select, D-pad                           |
 | `engine.js`   | pure game rules (movement, collisions, win check) — no DOM     |
-| `levels.js`   | level data (grid, walls, hazards, twins) — easy to extend      |
+| `levels.js`   | level data + chapters — **generated**, do not edit by hand     |
 | `audio.js`    | procedural Web Audio sound effects (`window.SFX`)              |
-| `game.js`     | level select, rendering, animation, keyboard + touch, flow     |
+| `game.js`     | chapter/level select, rendering, animation, keyboard + touch   |
+| `generate.js` | dev tool: generates + BFS-curates the levels in `levels.js`    |
 | `verify.js`   | dev tool: BFS solver that proves every level is solvable       |
 | `devserver.py`| dev tool: no-cache static server (see below)                   |
 
-`engine.js` is shared by the browser **and** the verifier, so the rules used to
-play are exactly the rules used to prove each level can be beaten.
+`engine.js` is shared by the browser, the generator, **and** the verifier, so
+the rules used to play are exactly the rules used to generate and to prove each
+level can be beaten.
 
 ## Running locally during development
 
@@ -68,16 +72,23 @@ server with caching disabled avoids stale files:
 python devserver.py 5193     # then open http://127.0.0.1:5193/
 ```
 
-## Adding your own levels
+## Generating levels
 
-Append an entry to the array in `levels.js`, then check it's solvable:
+`levels.js` is produced by `generate.js`. For each chapter it randomly builds
+candidate levels, runs the BFS solver, and keeps only ones that are solvable and
+whose minimum solution length lands in that chapter's difficulty band (with
+dedup). To change counts, grid sizes, mechanics, or difficulty, edit the chapter
+specs at the top of `generate.js`, then:
 
 ```sh
-node verify.js
+node generate.js     # rewrites levels.js (deterministic — fixed RNG seed)
+node verify.js       # independently re-proves every level is solvable
 ```
 
-It prints the minimum number of moves for each level (a handy difficulty proxy)
-and fails loudly if any level has no solution.
+`verify.js` prints the minimum number of moves per level (a handy difficulty
+proxy) and fails loudly if any level has no solution. Bumping the level count
+toward hundreds is just a matter of raising the per-chapter `count` (and adding
+more chapters).
 
 ## License
 

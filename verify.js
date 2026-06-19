@@ -7,7 +7,7 @@
  */
 
 var ENGINE = require("./engine.js");
-var LEVELS = require("./levels.js");
+var LEVELS = require("./levels.js").LEVELS;
 
 var DIR_NAMES = ["up", "down", "left", "right"];
 
