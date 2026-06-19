@@ -12,12 +12,22 @@ desync them — and steer clear of the spikes.
 
 ## Play
 
-Just open `index.html` in a browser. That's it.
+Just open `index.html` in a browser. That's it — works on desktop and mobile.
 
+Pick a level from the **level select** screen (clear a level to unlock the next;
+progress is saved on your device), then:
+
+**Desktop**
 - **Arrow keys** — move every twin one step (each through its own mirror)
-- **R** — restart the current level (or replay from level 1 on the win screen)
+- **R** — restart the current level
+- **Esc** — back to the level select
+- **🔊** — toggle sound
 
-No mouse, no other keys needed.
+**Mobile / touch**
+- **Swipe** on the board, or tap the on-screen **D-pad**
+- The **← Levels** button returns to the level select
+
+Sound effects are generated on the fly with the Web Audio API (no audio files).
 
 ## The mirrors
 
@@ -35,17 +45,28 @@ and spikes reset the level.
 
 ## Project layout
 
-| File         | Role                                                            |
-|--------------|-----------------------------------------------------------------|
-| `index.html` | page shell + canvas + UI                                        |
-| `style.css`  | dark neon theme                                                 |
-| `engine.js`  | pure game rules (movement, collisions, win check) — no DOM      |
-| `levels.js`  | level data (grid, walls, hazards, twins) — easy to extend       |
-| `game.js`    | rendering, animation, input, level flow                         |
-| `verify.js`  | dev tool: BFS solver that proves every level is solvable        |
+| File          | Role                                                           |
+|---------------|----------------------------------------------------------------|
+| `index.html`  | page shell + canvas + UI                                       |
+| `style.css`   | dark neon theme, level select, D-pad                           |
+| `engine.js`   | pure game rules (movement, collisions, win check) — no DOM     |
+| `levels.js`   | level data (grid, walls, hazards, twins) — easy to extend      |
+| `audio.js`    | procedural Web Audio sound effects (`window.SFX`)              |
+| `game.js`     | level select, rendering, animation, keyboard + touch, flow     |
+| `verify.js`   | dev tool: BFS solver that proves every level is solvable       |
+| `devserver.py`| dev tool: no-cache static server (see below)                   |
 
 `engine.js` is shared by the browser **and** the verifier, so the rules used to
 play are exactly the rules used to prove each level can be beaten.
+
+## Running locally during development
+
+Opening `index.html` directly works, but if you're editing the code a static
+server with caching disabled avoids stale files:
+
+```sh
+python devserver.py 5193     # then open http://127.0.0.1:5193/
+```
 
 ## Adding your own levels
 

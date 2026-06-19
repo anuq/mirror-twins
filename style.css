@@ -144,3 +144,146 @@ canvas {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* Make the hidden attribute win over flex/grid display rules. */
+[hidden] { display: none !important; }
+
+/* ---- Level select ------------------------------------------------------- */
+.menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 0 4px;
+}
+
+.menu-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  width: min(540px, 92vw);
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  aspect-ratio: 1 / 1;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid #2f3a64;
+  background: linear-gradient(180deg, #1a2240, #141a30);
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.08s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.tile .num { font-size: 22px; font-weight: 800; }
+.tile .nm { font-size: 10px; color: var(--muted); text-align: center; line-height: 1.1; }
+
+.tile:hover:not(.locked) { transform: translateY(-2px); }
+
+.tile.open {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 8px 24px rgba(124, 156, 255, 0.25);
+}
+
+.tile.done {
+  border-color: #2bd4a6;
+  background: linear-gradient(180deg, #15302a, #122520);
+}
+.tile.done .num { color: #5be3bf; }
+.tile.done::after {
+  content: "✓";
+  position: absolute;
+  top: 5px; right: 8px;
+  font-size: 12px;
+  color: #5be3bf;
+}
+
+.tile.locked {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.tile.locked .nm { visibility: hidden; }
+.tile.locked::after {
+  content: "🔒";
+  position: absolute;
+  top: 6px; right: 7px;
+  font-size: 11px;
+}
+
+.tile.sel {
+  outline: 3px solid #ffffff;
+  outline-offset: 2px;
+}
+
+.menu-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---- Buttons ------------------------------------------------------------ */
+.iconbtn, .textbtn {
+  font-family: inherit;
+  color: var(--text);
+  background: #20294a;
+  border: 1px solid #2f3a64;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  line-height: 1;
+}
+.iconbtn { font-size: 15px; }
+.iconbtn:hover, .textbtn:hover { background: #283464; }
+
+.controls { gap: 14px; }
+
+/* ---- Touch D-pad -------------------------------------------------------- */
+.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 56px);
+  grid-template-rows: repeat(3, 56px);
+  gap: 8px;
+  touch-action: none;
+}
+.dbtn {
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 1px solid #2f3a64;
+  background: linear-gradient(180deg, #222c52, #1a2140);
+  color: var(--text);
+  font-size: 22px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.dbtn:active { background: #324072; transform: scale(0.96); }
+.dbtn.up    { grid-area: 1 / 2; }
+.dbtn.left  { grid-area: 2 / 1; }
+.dbtn.right { grid-area: 2 / 3; }
+.dbtn.down  { grid-area: 3 / 2; }
+
+/* ---- Small screens ------------------------------------------------------ */
+@media (max-width: 520px) {
+  .wrap { padding: 14px; gap: 12px; }
+  h1 { font-size: 26px; }
+  .grid { grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .tile .nm { font-size: 9px; }
+}

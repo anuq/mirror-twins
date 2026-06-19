@@ -1,14 +1,17 @@
 /*
  * Mirror Twins — browser front-end.
- * Rendering, smooth animation, arrow-key input, and level progression.
- * All rules live in engine.js; level data in levels.js.
+ * Level select, rendering, smooth animation, keyboard + touch input,
+ * sound effects, and level progression.
+ * All rules live in engine.js; level data in levels.js; sounds in audio.js.
  */
 (function () {
   "use strict";
 
   var E = window.ENGINE;
   var LEVELS = window.LEVELS;
+  var SFX = window.SFX;
 
+  // DOM
   var canvas = document.getElementById("board");
   var ctx = canvas.getContext("2d");
   var levelLabel = document.getElementById("levelLabel");
@@ -16,24 +19,147 @@
   var overlay = document.getElementById("overlay");
   var overlayTitle = document.getElementById("overlayTitle");
   var overlaySub = document.getElementById("overlaySub");
+  var menuEl = document.getElementById("menu");
+  var gridEl = document.getElementById("levelGrid");
+  var stageEl = document.getElementById("stage");
+  var dpadEl = document.getElementById("dpad");
+  var backBtn = document.getElementById("backBtn");
+  var muteBtn = document.getElementById("muteBtn");
+  var keyhints = document.getElementById("keyhints");
 
-  var MAX_BOARD = 540;   // max board pixels (longest side)
-  var ANIM_MS = 110;     // per-step movement animation
-
+  var ANIM_MS = 110; // per-step movement animation
   var dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+  var isTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
 
-  // ---- Runtime state -------------------------------------------------------
+  // ---- Progress (persisted) -----------------------------------------------
+  var STORE = "mirrorTwins.progress.v1";
+  var progress = readProgress();
+  function readProgress() {
+    try {
+      var p = JSON.parse(localStorage.getItem(STORE));
+      if (p && typeof p.completed === "number") return p;
+    } catch (e) {}
+    return { completed: 0 };
+  }
+  function writeProgress() {
+    try { localStorage.setItem(STORE, JSON.stringify(progress)); } catch (e) {}
+  }
+  function nextPlayable() { return Math.min(progress.completed, LEVELS.length - 1); }
+  function isUnlocked(i) { return i >= 0 && i < LEVELS.length && i <= progress.completed; }
+  function tileState(i) {
+    if (i < progress.completed) return "done";
+    if (i === progress.completed && i < LEVELS.length) return "open";
+    return "locked";
+  }
+  function markCompleted(i) {
+    if (i + 1 > progress.completed) { progress.completed = i + 1; writeProgress(); }
+  }
+
+  // ---- Runtime state ------------------------------------------------------
+  var appMode = "menu";  // "menu" | "play"
+  var menuSel = 0;
   var levelIndex = 0;
   var level = null;
   var sets = null;
   var cell = 40;
-  var logical = [];      // [{x,y}] logical cell positions
-  var fromPos = [];      // animation start (in cells)
-  var toPos = [];        // animation end (in cells)
+  var logical = [];
+  var fromPos = [];
+  var toPos = [];
   var animStart = 0;
   var animating = false;
+  var animating_dead = false;
   var mode = "play";     // "play" | "solved" | "dead" | "won"
-  var shake = 0;         // dead-shake intensity
+  var shake = 0;
+
+  function clone(arr) { return arr.map(function (p) { return { x: p.x, y: p.y }; }); }
+
+  // ---- Level select -------------------------------------------------------
+  function menuCols() { return window.innerWidth <= 520 ? 4 : 5; }
+
+  function buildMenu() {
+    gridEl.innerHTML = "";
+    for (var i = 0; i < LEVELS.length; i++) {
+      var b = document.createElement("button");
+      b.className = "tile";
+      b.setAttribute("data-idx", String(i));
+      b.innerHTML = '<span class="num">' + (i + 1) + '</span>' +
+                    '<span class="nm">' + LEVELS[i].name + '</span>';
+      b.addEventListener("click", function () {
+        startLevel(parseInt(this.getAttribute("data-idx"), 10));
+      });
+      gridEl.appendChild(b);
+    }
+  }
+
+  function refreshMenu() {
+    gridEl.style.gridTemplateColumns = "repeat(" + menuCols() + ", 1fr)";
+    var tiles = gridEl.children;
+    for (var i = 0; i < tiles.length; i++) {
+      var st = tileState(i);
+      tiles[i].className = "tile " + st + (i === menuSel ? " sel" : "");
+      tiles[i].disabled = (st === "locked");
+    }
+  }
+
+  function showMenu() {
+    appMode = "menu";
+    mode = "play";
+    menuEl.hidden = false;
+    stageEl.hidden = true;
+    levelLabel.hidden = true;
+    backBtn.hidden = true;
+    dpadEl.hidden = true;
+    hintEl.textContent = "";
+    if (keyhints) keyhints.hidden = true;
+    menuSel = nextPlayable();
+    refreshMenu();
+  }
+
+  function startLevel(i) {
+    if (!isUnlocked(i)) { SFX.blocked(); return; }
+    SFX.resume();
+    SFX.select();
+    appMode = "play";
+    menuEl.hidden = true;
+    stageEl.hidden = false;
+    levelLabel.hidden = false;
+    backBtn.hidden = false;
+    if (keyhints) keyhints.hidden = false;
+    if (isTouch) dpadEl.hidden = false;
+    loadLevel(i);
+  }
+
+  function menuNav(dir) {
+    var cols = menuCols();
+    var n = LEVELS.length;
+    var s = menuSel;
+    if (dir === "left") s -= 1;
+    else if (dir === "right") s += 1;
+    else if (dir === "up") s -= cols;
+    else if (dir === "down") s += cols;
+    if (s < 0 || s >= n) return;
+    menuSel = s;
+    SFX.tick();
+    refreshMenu();
+  }
+
+  // ---- Level loading & sizing ---------------------------------------------
+  function computeMaxBoard() {
+    var w = Math.min(540, window.innerWidth - 36);
+    var h = window.innerHeight - (isTouch ? 360 : 230);
+    return Math.max(220, Math.min(w, h, 540));
+  }
+
+  function sizeCanvas() {
+    var maxb = computeMaxBoard();
+    cell = Math.floor(maxb / Math.max(level.w, level.h));
+    var w = cell * level.w, h = cell * level.h;
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
 
   function loadLevel(i) {
     levelIndex = i;
@@ -45,59 +171,22 @@
     animating = false;
     mode = "play";
     shake = 0;
-
-    cell = Math.floor(MAX_BOARD / Math.max(level.w, level.h));
-    var w = cell * level.w, h = cell * level.h;
-    canvas.style.width = w + "px";
-    canvas.style.height = h + "px";
-    canvas.width = Math.floor(w * dpr);
-    canvas.height = Math.floor(h * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
+    sizeCanvas();
     levelLabel.textContent = "Level " + (i + 1) + " / " + LEVELS.length + " — " + level.name;
     hintEl.textContent = level.hint || "";
     hideOverlay();
     renderFrame(performance.now()); // paint immediately, don't wait for first rAF
   }
 
-  function clone(arr) { return arr.map(function (p) { return { x: p.x, y: p.y }; }); }
-
-  // ---- Input ---------------------------------------------------------------
-  var KEYMAP = {
-    ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
-  };
-
-  window.addEventListener("keydown", function (ev) {
-    if (ev.key === "r" || ev.key === "R") {
-      ev.preventDefault();
-      if (mode === "won") loadLevel(0); else loadLevel(levelIndex);
-      return;
+  // ---- Move logic ---------------------------------------------------------
+  function satisfiedCount(pos) {
+    var c = 0;
+    for (var i = 0; i < level.avatars.length; i++) {
+      var g = level.avatars[i].goal;
+      if (pos[i].x === g[0] && pos[i].y === g[1]) c++;
     }
-
-    var dir = KEYMAP[ev.key];
-    if (!dir) return;
-    ev.preventDefault();
-
-    if (mode === "won") { loadLevel(0); return; }
-    if (mode !== "play" || animating) return;
-
-    var res = E.resolveStep(level, logical, dir, sets);
-
-    // Nothing moved? ignore (no animation, no state change).
-    if (samePositions(res.positions, logical)) return;
-
-    fromPos = clone(logical);
-    toPos = clone(res.positions);
-    logical = res.positions;
-    animStart = performance.now();
-    animating = true;
-    animating_dead = res.dead;
-    // Step completion is driven by a timer, not the render loop, so it still
-    // fires if the tab is backgrounded (rAF can be paused/throttled there).
-    setTimeout(onAnimEnd, ANIM_MS);
-  }, { passive: false });
-
-  var animating_dead = false;
+    return c;
+  }
 
   function samePositions(a, b) {
     for (var i = 0; i < a.length; i++) {
@@ -106,9 +195,31 @@
     return true;
   }
 
-  // ---- Step resolution callbacks ------------------------------------------
+  function tryMove(dir) {
+    if (appMode !== "play" || mode !== "play" || animating) return;
+    var res = E.resolveStep(level, logical, dir, sets);
+    if (samePositions(res.positions, logical)) { SFX.blocked(); return; }
+
+    var before = satisfiedCount(logical);
+    fromPos = clone(logical);
+    toPos = clone(res.positions);
+    logical = res.positions;
+    animStart = performance.now();
+    animating = true;
+    animating_dead = res.dead;
+
+    if (res.dead) {
+      SFX.spike();
+    } else {
+      SFX.move();
+      if (satisfiedCount(logical) > before && !E.isWon(level, logical)) SFX.lock();
+    }
+    // Step completion via timer (fires even if rAF is throttled in a bg tab).
+    setTimeout(onAnimEnd, ANIM_MS);
+  }
+
   function onAnimEnd() {
-    if (!animating) return; // guard against any double-fire
+    if (!animating) return;
     animating = false;
     if (animating_dead) {
       mode = "dead";
@@ -118,11 +229,14 @@
       return;
     }
     if (E.isWon(level, logical)) {
+      markCompleted(levelIndex);
       if (levelIndex + 1 >= LEVELS.length) {
         mode = "won";
-        showOverlay("You Win! ✨", "All twins reunited. Press any arrow to play again.");
+        SFX.win();
+        showOverlay("You Win! ✨", "All levels complete! Press any key for the menu.");
       } else {
         mode = "solved";
+        SFX.solved();
         showOverlay("Solved!", "Level " + (levelIndex + 2) + " coming up…");
         setTimeout(function () { loadLevel(levelIndex + 1); }, 850);
       }
@@ -136,7 +250,77 @@
   }
   function hideOverlay() { overlay.hidden = true; }
 
-  // ---- Rendering -----------------------------------------------------------
+  // ---- Input: keyboard ----------------------------------------------------
+  var KEYMAP = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
+
+  window.addEventListener("keydown", function (ev) {
+    SFX.resume();
+
+    if (appMode === "menu") {
+      var md = KEYMAP[ev.key];
+      if (md) { ev.preventDefault(); menuNav(md); return; }
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); startLevel(menuSel); return; }
+      return;
+    }
+
+    // play mode
+    if (ev.key === "Escape") { ev.preventDefault(); showMenu(); return; }
+    if (mode === "won") { ev.preventDefault(); showMenu(); return; }
+    if (ev.key === "r" || ev.key === "R") { ev.preventDefault(); loadLevel(levelIndex); return; }
+
+    var dir = KEYMAP[ev.key];
+    if (!dir) return;
+    ev.preventDefault();
+    tryMove(dir);
+  }, { passive: false });
+
+  // ---- Input: D-pad -------------------------------------------------------
+  dpadEl.addEventListener("click", function (ev) {
+    var btn = ev.target.closest("button[data-dir]");
+    if (!btn) return;
+    SFX.resume();
+    handleDir(btn.getAttribute("data-dir"));
+  });
+
+  function handleDir(dir) {
+    if (appMode === "menu") { menuNav(dir); return; }
+    if (mode === "won") { showMenu(); return; }
+    tryMove(dir);
+  }
+
+  // ---- Input: swipe on the board ------------------------------------------
+  var sx = 0, sy = 0, swiping = false;
+  stageEl.addEventListener("touchstart", function (ev) {
+    SFX.resume();
+    var t = ev.changedTouches[0];
+    sx = t.clientX; sy = t.clientY; swiping = true;
+  }, { passive: true });
+  stageEl.addEventListener("touchmove", function (ev) {
+    if (swiping) ev.preventDefault(); // stop the page scrolling under a swipe
+  }, { passive: false });
+  stageEl.addEventListener("touchend", function (ev) {
+    if (!swiping) return;
+    swiping = false;
+    var t = ev.changedTouches[0];
+    var dx = t.clientX - sx, dy = t.clientY - sy;
+    var ax = Math.abs(dx), ay = Math.abs(dy);
+    if (Math.max(ax, ay) < 24) return; // a tap, not a swipe
+    var dir = ax > ay ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+    handleDir(dir);
+  }, { passive: true });
+
+  // ---- Buttons ------------------------------------------------------------
+  backBtn.addEventListener("click", function () { SFX.select(); showMenu(); });
+  function updateMuteBtn() { muteBtn.textContent = SFX.isMuted() ? "🔇" : "🔊"; }
+  muteBtn.addEventListener("click", function () { SFX.toggleMute(); updateMuteBtn(); });
+  updateMuteBtn();
+
+  window.addEventListener("resize", function () {
+    if (appMode === "play" && level) { sizeCanvas(); renderFrame(performance.now()); }
+    else if (appMode === "menu") { refreshMenu(); }
+  });
+
+  // ---- Rendering ----------------------------------------------------------
   function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 
   function loop(now) {
@@ -145,10 +329,11 @@
   }
 
   function renderFrame(now) {
+    if (!level || appMode !== "play") return;
     var t = 1;
     if (animating) {
       t = (now - animStart) / ANIM_MS;
-      if (t >= 1) { t = 1; }
+      if (t >= 1) t = 1;
     }
     var e = easeOutCubic(t);
 
@@ -168,7 +353,6 @@
     drawHazards();
     drawGoals();
 
-    // avatars (interpolated)
     for (var i = 0; i < level.avatars.length; i++) {
       var fx = fromPos[i].x + (toPos[i].x - fromPos[i].x) * e;
       var fy = fromPos[i].y + (toPos[i].y - fromPos[i].y) * e;
@@ -181,12 +365,8 @@
   function drawGrid() {
     ctx.strokeStyle = getCss("--grid");
     ctx.lineWidth = 1;
-    for (var x = 0; x <= level.w; x++) {
-      line(x * cell, 0, x * cell, level.h * cell);
-    }
-    for (var y = 0; y <= level.h; y++) {
-      line(0, y * cell, level.w * cell, y * cell);
-    }
+    for (var x = 0; x <= level.w; x++) line(x * cell, 0, x * cell, level.h * cell);
+    for (var y = 0; y <= level.h; y++) line(0, y * cell, level.w * cell, y * cell);
   }
 
   function line(x1, y1, x2, y2) {
@@ -257,7 +437,6 @@
     ctx.fillStyle = color;
     roundRect(x, y, s, s, Math.max(4, cell * 0.16));
     ctx.fill();
-    // inner highlight
     ctx.shadowBlur = 0;
     ctx.fillStyle = "rgba(255,255,255,0.28)";
     roundRect(x + s * 0.18, y + s * 0.14, s * 0.4, s * 0.22, 4);
@@ -283,7 +462,8 @@
     return cssCache[name];
   }
 
-  // ---- Boot ----------------------------------------------------------------
-  loadLevel(0);
+  // ---- Boot ---------------------------------------------------------------
+  buildMenu();
+  showMenu();
   requestAnimationFrame(loop);
 })();

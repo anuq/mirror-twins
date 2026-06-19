@@ -2,18 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Mirror Twins</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=2" />
 </head>
 <body>
   <main class="wrap">
     <header class="topbar">
       <h1>Mirror&nbsp;Twins</h1>
-      <div class="level" id="levelLabel">Level 1 / 10</div>
+      <div class="level" id="levelLabel" hidden></div>
     </header>
 
-    <div class="stage">
+    <!-- Level select -->
+    <section class="menu" id="menu">
+      <h2 class="menu-title">Select a Level</h2>
+      <div class="grid" id="levelGrid"></div>
+      <p class="menu-note">Clear a level to unlock the next. Progress is saved on this device.</p>
+    </section>
+
+    <!-- Playfield -->
+    <div class="stage" id="stage" hidden>
       <canvas id="board"></canvas>
       <div class="overlay" id="overlay" hidden>
         <div class="overlay-card">
@@ -25,15 +33,28 @@
 
     <p class="hint" id="hint"></p>
 
+    <!-- Touch D-pad (shown on touch devices) -->
+    <div class="dpad" id="dpad" hidden>
+      <button class="dbtn up" data-dir="up" aria-label="Up">&uarr;</button>
+      <button class="dbtn left" data-dir="left" aria-label="Left">&larr;</button>
+      <button class="dbtn right" data-dir="right" aria-label="Right">&rarr;</button>
+      <button class="dbtn down" data-dir="down" aria-label="Down">&darr;</button>
+    </div>
+
     <footer class="controls">
-      <span class="keys"><span class="key">&larr;</span><span class="key">&uarr;</span><span class="key">&darr;</span><span class="key">&rarr;</span> move all twins</span>
-      <span class="sep">&middot;</span>
-      <span><span class="key">R</span> restart level</span>
+      <button class="textbtn" id="backBtn" hidden>&larr; Levels</button>
+      <span class="keyhints" id="keyhints">
+        <span class="keys"><span class="key">&larr;</span><span class="key">&uarr;</span><span class="key">&darr;</span><span class="key">&rarr;</span> move</span>
+        <span class="sep">&middot;</span>
+        <span><span class="key">R</span> restart</span>
+      </span>
+      <button class="iconbtn" id="muteBtn" aria-label="Toggle sound">🔊</button>
     </footer>
   </main>
 
-  <script src="engine.js"></script>
-  <script src="levels.js"></script>
-  <script src="game.js"></script>
+  <script src="engine.js?v=2"></script>
+  <script src="levels.js?v=2"></script>
+  <script src="audio.js?v=2"></script>
+  <script src="game.js?v=2"></script>
 </body>
 </html>

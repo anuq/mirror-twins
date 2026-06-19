@@ -4,7 +4,7 @@
     {
       "name": "mirror-twins",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "5193"],
+      "runtimeArgs": ["devserver.py", "5193"],
       "port": 5193
     }
   ]
