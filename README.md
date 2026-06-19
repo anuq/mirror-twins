@@ -78,3 +78,9 @@ node verify.js
 
 It prints the minimum number of moves for each level (a handy difficulty proxy)
 and fails loudly if any level has no solution.
+
+## License
+
+Mirror Twins is an original game — engine, levels, rendering, and sound were all
+written from scratch with no third-party code or assets. It is released under the
+[MIT License](LICENSE). © 2026 Anup Shetye.

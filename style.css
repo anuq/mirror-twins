@@ -280,6 +280,17 @@ canvas {
 .dbtn.right { grid-area: 2 / 3; }
 .dbtn.down  { grid-area: 3 / 2; }
 
+/* ---- Credit footer ------------------------------------------------------ */
+.credit {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.7;
+  text-align: center;
+}
+.credit a { color: var(--accent); text-decoration: none; }
+.credit a:hover { text-decoration: underline; }
+
 /* ---- Small screens ------------------------------------------------------ */
 @media (max-width: 520px) {
   .wrap { padding: 14px; gap: 12px; }
