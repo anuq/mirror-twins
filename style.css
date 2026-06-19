@@ -1,0 +1,146 @@
+:root {
+  --bg: #0b1020;
+  --bg2: #131a30;
+  --panel: #161d36;
+  --grid: #243056;
+  --wall: #2c3760;
+  --text: #e6ecff;
+  --muted: #8a96c4;
+  --accent: #7c9cff;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #1a2b55 0%, transparent 60%),
+    linear-gradient(160deg, var(--bg) 0%, #070a16 100%);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 24px;
+}
+
+.topbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  background: linear-gradient(90deg, #22d3ee, #f472b6, #fbbf24, #a3e635);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-transform: uppercase;
+}
+
+.level {
+  font-size: 14px;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+
+.stage {
+  position: relative;
+  border-radius: 16px;
+  padding: 14px;
+  background: linear-gradient(180deg, var(--bg2), var(--panel));
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+canvas {
+  display: block;
+  border-radius: 8px;
+}
+
+.hint {
+  margin: 0;
+  max-width: 520px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  min-height: 18px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.keys { display: inline-flex; align-items: center; gap: 6px; }
+.sep { opacity: 0.5; }
+
+.key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: #20294a;
+  border: 1px solid #2f3a64;
+  box-shadow: 0 2px 0 #11152a;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.overlay {
+  position: absolute;
+  inset: 14px;
+  display: grid;
+  place-items: center;
+  background: rgba(7, 10, 22, 0.72);
+  backdrop-filter: blur(3px);
+  border-radius: 8px;
+  animation: fade 0.18s ease-out;
+}
+
+.overlay[hidden] { display: none; }
+
+.overlay-card {
+  text-align: center;
+  padding: 18px 26px;
+}
+
+.overlay-title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.overlay-sub {
+  font-size: 15px;
+  color: var(--muted);
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

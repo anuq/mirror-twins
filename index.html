@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mirror Twins</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="wrap">
+    <header class="topbar">
+      <h1>Mirror&nbsp;Twins</h1>
+      <div class="level" id="levelLabel">Level 1 / 10</div>
+    </header>
+
+    <div class="stage">
+      <canvas id="board"></canvas>
+      <div class="overlay" id="overlay" hidden>
+        <div class="overlay-card">
+          <div class="overlay-title" id="overlayTitle"></div>
+          <div class="overlay-sub" id="overlaySub"></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="hint" id="hint"></p>
+
+    <footer class="controls">
+      <span class="keys"><span class="key">&larr;</span><span class="key">&uarr;</span><span class="key">&darr;</span><span class="key">&rarr;</span> move all twins</span>
+      <span class="sep">&middot;</span>
+      <span><span class="key">R</span> restart level</span>
+    </footer>
+  </main>
+
+  <script src="engine.js"></script>
+  <script src="levels.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
