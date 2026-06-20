@@ -151,12 +151,13 @@ var ALLT = ["normal", "mirrorX", "mirrorY", "mirrorXY", "rot90", "rot270"];
 // Each chapter is one or more buckets, concatenated (in order) and sorted by
 // difficulty within each bucket — giving a smooth ramp.
 var CHAPTER_BUCKETS = [
-  [ // 1 — First Steps: a tiny tutorial, then introduce a mirror twin
+  [ // 1 — First Steps: a tiny tutorial, then introduce a mirror twin.
+    //     No walls/spikes — keep it purely about movement + reflection.
     { twins: 1, count: 2, w: [4, 5], h: [4, 5], walls: [0, 0], haz: [0, 0], transforms: ["normal"], band: [3, 6] },
-    { twins: 2, count: 8, w: [5, 6], h: [4, 6], walls: [0, 1], haz: [0, 0], transforms: ["normal", "mirrorX"], band: [4, 10], requireSpecial: 1 },
+    { twins: 2, count: 8, w: [5, 6], h: [4, 6], walls: [0, 0], haz: [0, 0], transforms: ["normal", "mirrorX"], band: [4, 10], requireSpecial: 1 },
   ],
-  [ // 2 — Reflections: both twins are mirrors (no plain "normal")
-    { twins: 2, count: 10, w: [5, 6], h: [5, 6], walls: [0, 2], haz: [0, 0], transforms: ["mirrorX", "mirrorY", "mirrorXY"], band: [6, 13], requireSpecial: 2 },
+  [ // 2 — Reflections: both twins are mirrors, open grids (walls arrive in ch.3)
+    { twins: 2, count: 10, w: [5, 6], h: [5, 6], walls: [0, 0], haz: [0, 0], transforms: ["mirrorX", "mirrorY", "mirrorXY"], band: [6, 13], requireSpecial: 2 },
   ],
   [ // 3 — Blocking Walls: walls must be load-bearing
     { twins: 2, count: 10, w: [5, 7], h: [5, 7], walls: [2, 6], haz: [0, 0], transforms: ALLMIRROR, band: [7, 18], requireSpecial: 1, requireWallLB: true },
