@@ -1,22 +1,30 @@
 /*
  * Mirror Twins — level generator (dev tool).
  *
- * Procedurally generates candidate levels per chapter, then KEEPS only the
- * ones the BFS solver proves are solvable AND whose minimum solution length
- * falls inside that chapter's difficulty band. Every shipped level is
- * therefore guaranteed solvable, using the exact same engine the game runs.
+ * Procedurally generates candidate levels per chapter, then KEEPS only ones
+ * that the BFS solver proves solvable, that land in the chapter's difficulty
+ * band, AND that satisfy per-bucket QUALITY constraints so every chapter
+ * actually delivers its theme:
+ *   - requireSpecial:   at least N twins use a non-"normal" (mirror/rotation)
+ *                       transform — so "Reflections" really has reflections.
+ *   - requireWallLB:    walls are load-bearing (removing them changes the
+ *                       minimum solution or makes it unsolvable).
+ *   - requireHazardLB:  spikes force a detour (removing them shortens the
+ *                       solution), so spikes are never pointless.
+ *   - requireObstacleLB: a wall OR a spike is load-bearing.
  *
- * Run: node generate.js   (overwrites levels.js)
+ * Every shipped level is therefore solvable AND non-degenerate, using the
+ * exact same engine the game runs.
  *
- * Deterministic: a fixed RNG seed means re-running produces the same set,
- * so levels.js only changes when this generator changes.
+ * Run: node generate.js   (overwrites levels.js)   then: node verify.js
+ * Deterministic: a fixed RNG seed means re-running produces the same set.
  */
 
 var fs = require("fs");
 var E = require("./engine.js");
 
-// ---- Seeded RNG (mulberry32) so output is reproducible ------------------
-var SEED = 1337;
+// ---- Seeded RNG (mulberry32) --------------------------------------------
+var SEED = 20260620;
 function mulberry32(a) {
   return function () {
     a |= 0; a = (a + 0x6D2B79F5) | 0;
@@ -30,44 +38,43 @@ function ri(n) { return Math.floor(rng() * n); }
 function rint(lo, hi) { return lo + ri(hi - lo + 1); }
 function pick(arr) { return arr[ri(arr.length)]; }
 
-// ---- BFS solver with a state cap ----------------------------------------
+// ---- BFS solver: minimum solution length, with a state cap --------------
 var DIRS = ["up", "down", "left", "right"];
 function keyOf(ps) { return ps.map(function (p) { return p.x + "," + p.y; }).join("|"); }
+var CAP = 200000;
 
-function solve(level, cap) {
+function minMoves(level) {
   var sets = E.buildSets(level);
   var start = E.startPositions(level);
-  if (E.isWon(level, start)) return { ok: false }; // already solved = trivial, reject
+  if (E.isWon(level, start)) return 0;
   var seen = new Set([keyOf(start)]);
   var q = [start], depth = [0], head = 0;
   while (head < q.length) {
-    if (seen.size > cap) return { ok: false, capped: true };
+    if (seen.size > CAP) return -2; // too complex, treat as reject
     var pos = q[head], d = depth[head]; head++;
     for (var i = 0; i < 4; i++) {
       var r = E.resolveStep(level, pos, DIRS[i], sets);
       if (r.dead) continue;
       var k = keyOf(r.positions);
       if (seen.has(k)) continue;
-      if (E.isWon(level, r.positions)) return { ok: true, moves: d + 1 };
-      seen.add(k);
-      q.push(r.positions);
-      depth.push(d + 1);
+      if (E.isWon(level, r.positions)) return d + 1;
+      seen.add(k); q.push(r.positions); depth.push(d + 1);
     }
   }
-  return { ok: false };
+  return -1; // unsolvable
 }
 
 // ---- Candidate generation -----------------------------------------------
 var PALETTE = ["#22d3ee", "#f472b6", "#fbbf24", "#a3e635"];
 
-function genCandidate(spec) {
-  var w = rint(spec.w[0], spec.w[1]);
-  var h = rint(spec.h[0], spec.h[1]);
+function genCandidate(b) {
+  var w = rint(b.w[0], b.w[1]);
+  var h = rint(b.h[0], b.h[1]);
   var area = w * h;
-  var twins = pick(spec.twins);
-  var nWall = rint(spec.walls[0], spec.walls[1]);
-  var nHaz = rint(spec.haz[0], spec.haz[1]);
-  if (twins * 2 + nWall + nHaz > area * 0.7) return null; // too crowded
+  var twins = b.twins;
+  var nWall = rint(b.walls[0], b.walls[1]);
+  var nHaz = rint(b.haz[0], b.haz[1]);
+  if (twins * 2 + nWall + nHaz > area * 0.7) return null;
 
   var occupied = {};
   function take() {
@@ -86,25 +93,50 @@ function genCandidate(spec) {
   for (var g = 0; g < twins; g++) { var gc = take(); if (!gc) return null; goals.push(gc); }
   for (var a = 0; a < twins; a++) {
     avatars.push({
-      start: starts[a],
-      goal: goals[a],
-      color: PALETTE[a],
-      transform: twins === 1 ? "normal" : pick(spec.transforms),
+      start: starts[a], goal: goals[a], color: PALETTE[a],
+      transform: twins === 1 ? "normal" : pick(b.transforms),
     });
   }
   return { w: w, h: h, walls: walls, hazards: hazards, avatars: avatars };
 }
 
+function specialsCount(L) {
+  return L.avatars.filter(function (a) { return a.transform !== "normal"; }).length;
+}
+function without(L, field) {
+  var c = { w: L.w, h: L.h, walls: L.walls, hazards: L.hazards, avatars: L.avatars };
+  c[field] = [];
+  return c;
+}
+
+// Quality gate for a solvable candidate with known min-move count.
+function passesQuality(L, b, moves) {
+  if (b.requireSpecial && specialsCount(L) < b.requireSpecial) return false;
+  if (b.requireWallLB) {
+    if (!L.walls.length) return false;
+    var m = minMoves(without(L, "walls"));
+    if (!(m === -1 || m !== moves)) return false; // walls must matter
+  }
+  if (b.requireHazardLB) {
+    if (!L.hazards.length) return false;
+    var mh = minMoves(without(L, "hazards"));
+    if (!(mh >= 0 && mh < moves)) return false; // spike must force a detour
+  }
+  if (b.requireObstacleLB) {
+    var wLB = L.walls.length && (function () { var m = minMoves(without(L, "walls")); return m === -1 || m !== moves; })();
+    var hLB = L.hazards.length && (function () { var m = minMoves(without(L, "hazards")); return m >= 0 && m < moves; })();
+    if (!wLB && !hLB) return false;
+  }
+  return true;
+}
+
 function signature(L) {
   function sc(list) { return list.map(function (c) { return c[0] + "," + c[1]; }).sort().join(";"); }
-  var av = L.avatars.map(function (a) {
-    return a.start.join(",") + ">" + a.goal.join(",") + ":" + a.transform;
-  }).sort().join("|");
+  var av = L.avatars.map(function (a) { return a.start.join(",") + ">" + a.goal.join(",") + ":" + a.transform; }).sort().join("|");
   return L.w + "x" + L.h + "#" + sc(L.walls) + "#" + sc(L.hazards) + "#" + av;
 }
 
-// ---- Chapter specs ------------------------------------------------------
-var CAP = 200000; // BFS state cap per candidate
+// ---- Chapters & buckets -------------------------------------------------
 var CHAPTERS = [
   { name: "First Steps", blurb: "Guide each twin onto its own matching ring." },
   { name: "Reflections", blurb: "Mirror twins flip your moves — watch which way each one goes." },
@@ -112,58 +144,77 @@ var CHAPTERS = [
   { name: "Spikes", blurb: "Spikes reset the level. Route every twin safely around them." },
   { name: "Mastery", blurb: "Everything at once: mirrors, rotations, walls and spikes." },
 ];
-var SPECS = [
-  { twins: [1, 1, 2], w: [4, 5], h: [4, 5], walls: [0, 0], haz: [0, 0],
-    transforms: ["normal", "mirrorX"], band: [3, 9], count: 10 },
-  { twins: [2], w: [5, 6], h: [5, 6], walls: [0, 2], haz: [0, 0],
-    transforms: ["normal", "mirrorX", "mirrorY", "mirrorXY"], band: [5, 12], count: 10 },
-  { twins: [2], w: [5, 7], h: [5, 7], walls: [3, 7], haz: [0, 0],
-    transforms: ["normal", "mirrorX", "mirrorY", "mirrorXY"], band: [7, 17], count: 10 },
-  { twins: [2], w: [5, 7], h: [5, 7], walls: [0, 3], haz: [1, 4],
-    transforms: ["normal", "mirrorX", "mirrorY", "mirrorXY"], band: [7, 17], count: 10 },
-  { twins: [2, 2, 3], w: [5, 7], h: [5, 7], walls: [0, 4], haz: [0, 3],
-    transforms: ["normal", "mirrorX", "mirrorY", "mirrorXY", "rot90", "rot270"], band: [9, 26], count: 10 },
+
+var ALLMIRROR = ["normal", "mirrorX", "mirrorY", "mirrorXY"];
+var ALLT = ["normal", "mirrorX", "mirrorY", "mirrorXY", "rot90", "rot270"];
+
+// Each chapter is one or more buckets, concatenated (in order) and sorted by
+// difficulty within each bucket — giving a smooth ramp.
+var CHAPTER_BUCKETS = [
+  [ // 1 — First Steps: a tiny tutorial, then introduce a mirror twin
+    { twins: 1, count: 2, w: [4, 5], h: [4, 5], walls: [0, 0], haz: [0, 0], transforms: ["normal"], band: [3, 6] },
+    { twins: 2, count: 8, w: [5, 6], h: [4, 6], walls: [0, 1], haz: [0, 0], transforms: ["normal", "mirrorX"], band: [4, 10], requireSpecial: 1 },
+  ],
+  [ // 2 — Reflections: both twins are mirrors (no plain "normal")
+    { twins: 2, count: 10, w: [5, 6], h: [5, 6], walls: [0, 2], haz: [0, 0], transforms: ["mirrorX", "mirrorY", "mirrorXY"], band: [6, 13], requireSpecial: 2 },
+  ],
+  [ // 3 — Blocking Walls: walls must be load-bearing
+    { twins: 2, count: 10, w: [5, 7], h: [5, 7], walls: [2, 6], haz: [0, 0], transforms: ALLMIRROR, band: [7, 18], requireSpecial: 1, requireWallLB: true },
+  ],
+  [ // 4 — Spikes: a spike must force a detour
+    { twins: 2, count: 10, w: [5, 7], h: [5, 7], walls: [0, 3], haz: [1, 4], transforms: ALLMIRROR, band: [7, 18], requireSpecial: 1, requireHazardLB: true },
+  ],
+  [ // 5 — Mastery: mirrors+rotations with load-bearing obstacles, then 3 twins
+    { twins: 2, count: 5, w: [5, 7], h: [5, 7], walls: [1, 4], haz: [0, 2], transforms: ALLT, band: [9, 22], requireSpecial: 1, requireObstacleLB: true },
+    { twins: 3, count: 5, w: [6, 7], h: [6, 7], walls: [0, 3], haz: [0, 2], transforms: ALLT, band: [11, 26], requireSpecial: 2 },
+  ],
 ];
 
 // ---- Build ---------------------------------------------------------------
 var seen = {};
 var allLevels = [];
-var MAX_ATTEMPTS = 400000;
+var MAX_ATTEMPTS = 1500000;
 
-for (var c = 0; c < SPECS.length; c++) {
-  var spec = SPECS[c];
-  var kept = [];
-  var attempts = 0;
-  while (kept.length < spec.count && attempts < MAX_ATTEMPTS) {
-    attempts++;
-    var cand = genCandidate(spec);
-    if (!cand) continue;
-    var sig = signature(cand);
-    if (seen[sig]) continue;
-    var res = solve(cand, CAP);
-    if (!res.ok) continue;
-    if (res.moves < spec.band[0] || res.moves > spec.band[1]) continue;
-    seen[sig] = true;
-    cand.moves = res.moves;
-    kept.push(cand);
+for (var c = 0; c < CHAPTER_BUCKETS.length; c++) {
+  var chapterLevels = [];
+  var buckets = CHAPTER_BUCKETS[c];
+  for (var bi = 0; bi < buckets.length; bi++) {
+    var b = buckets[bi];
+    var kept = [];
+    var attempts = 0;
+    while (kept.length < b.count && attempts < MAX_ATTEMPTS) {
+      attempts++;
+      var cand = genCandidate(b);
+      if (!cand) continue;
+      var sig = signature(cand);
+      if (seen[sig]) continue;
+      var moves = minMoves(cand);
+      if (moves < b.band[0] || moves > b.band[1]) continue;
+      if (!passesQuality(cand, b, moves)) continue;
+      seen[sig] = true;
+      cand.moves = moves;
+      kept.push(cand);
+    }
+    kept.sort(function (a, b2) { return a.moves - b2.moves; });
+    chapterLevels = chapterLevels.concat(kept);
+    if (kept.length < b.count) {
+      console.log("  !! Chapter " + (c + 1) + " bucket " + (bi + 1) + " only found " +
+        kept.length + "/" + b.count + " after " + attempts + " attempts");
+    }
   }
-  kept.sort(function (a, b) { return a.moves - b.moves; });
-  for (var i = 0; i < kept.length; i++) {
-    var L = kept[i];
+  for (var i = 0; i < chapterLevels.length; i++) {
+    var L = chapterLevels[i];
     L.chapter = c;
     L.name = CHAPTERS[c].name + " " + (i + 1);
     L.hint = CHAPTERS[c].blurb;
     allLevels.push(L);
   }
-  console.log("Chapter " + (c + 1) + " " + CHAPTERS[c].name + ": kept " +
-    kept.length + "/" + spec.count + " (attempts " + attempts + ", moves " +
-    (kept.length ? kept[0].moves + "-" + kept[kept.length - 1].moves : "-") + ")");
+  console.log("Chapter " + (c + 1) + " " + CHAPTERS[c].name + ": " + chapterLevels.length +
+    " levels (moves " + chapterLevels[0].moves + "-" + chapterLevels[chapterLevels.length - 1].moves + ")");
 }
 
 // ---- Emit levels.js ------------------------------------------------------
-function fmtCells(list) {
-  return "[" + list.map(function (c) { return "[" + c[0] + "," + c[1] + "]"; }).join(", ") + "]";
-}
+function fmtCells(list) { return "[" + list.map(function (c) { return "[" + c[0] + "," + c[1] + "]"; }).join(", ") + "]"; }
 function fmtLevel(L) {
   var lines = [];
   lines.push("  {");
@@ -187,7 +238,7 @@ out.push(" * " + allLevels.length + " levels across " + CHAPTERS.length + " chap
 out.push(" * Regenerate with: node generate.js   (then: node verify.js)");
 out.push(" */");
 out.push("");
-out.push("var CHAPTERS = " + JSON.stringify(CHAPTERS, null, 2).replace(/\n/g, "\n") + ";");
+out.push("var CHAPTERS = " + JSON.stringify(CHAPTERS, null, 2) + ";");
 out.push("");
 out.push("var LEVELS = [");
 out.push(allLevels.map(fmtLevel).join("\n"));
